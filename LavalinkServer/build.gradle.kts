@@ -62,7 +62,6 @@ dependencies {
     }
 
     implementation(libs.koe) {
-        // This version of SLF4J does not recognise Logback 1.2.3
         exclude(group = "org.slf4j", module = "slf4j-api")
     }
     implementation(libs.koe.udpqueue) {
@@ -72,7 +71,7 @@ dependencies {
         exclude(group = "com.sedmelluq", module = "lava-common")
     }
 
-    implementation(libs.lavaplayer)
+    implementation("com.github.lavalink-devs:lavaplayer:2.2.4")
     implementation(libs.lavaplayer.ip.rotator)
 
     implementation(libs.lavadsp)
@@ -80,7 +79,6 @@ dependencies {
     implementation(libs.logback)
     implementation(libs.sentry.logback)
     implementation(libs.oshi) {
-        // This version of SLF4J does not recognise Logback 1.2.3
         exclude(group = "org.slf4j", module = "slf4j-api")
     }
 
@@ -96,10 +94,10 @@ tasks {
 
     processResources {
         val tokens = mapOf(
-            "project.version"    to project.version,
-            "project.groupId"    to project.group,
+            "project.version" to project.version,
+            "project.groupId" to project.group,
             "project.artifactId" to "Lavalink-Server",
-            "env.BUILD_TIME"     to System.currentTimeMillis().toString()
+            "env.BUILD_TIME" to System.currentTimeMillis().toString()
         )
 
         filter(ReplaceTokens::class, mapOf("tokens" to tokens))
@@ -109,7 +107,6 @@ tasks {
         }
     }
 
-    // https://stackoverflow.com/questions/41444916/multiple-artifacts-issue-with-deploying-zip-to-nexus
     named<AbstractArchiveTask>("bootDistTar") {
         archiveClassifier = "bootTar"
     }
@@ -123,7 +120,6 @@ tasks {
     }
 
     val nativesJar = create<Jar>("lavaplayerNativesJar") {
-        // Only add musl natives
         from(configurations.runtimeClasspath.get().find { it.name.contains("lavaplayer-natives") }?.let { file ->
             zipTree(file).matching {
                 include {
@@ -136,18 +132,14 @@ tasks {
         archiveClassifier = "musl"
     }
 
-
     withType<BootJar> {
         archiveFileName = "Lavalink.jar"
 
         if (findProperty("targetPlatform") == "musl") {
             archiveFileName = "Lavalink-musl.jar"
-            // Exclude base dependency jar
             exclude {
                 it.name.contains("lavaplayer-natives-fork") || (it.name.contains("udpqueue-native-") && !it.name.contains("musl"))
             }
-
-            // Add custom jar
             classpath(nativesJar.outputs)
             dependsOn(nativesJar)
         }
@@ -155,15 +147,10 @@ tasks {
 
     withType<BootRun> {
         dependsOn("compileTestJava")
-
-        //pass in custom jvm args
-        // source: https://stackoverflow.com/a/25079415
-        // example: ./gradlew bootRun -PjvmArgs="--illegal-access=debug -Dwhatever=value"
         if (project.hasProperty("jvmArgs")) {
             val args = project.property("jvmArgs")
                 .toString()
                 .split("\\s".toPattern())
-
             jvmArgs?.addAll(args)
         }
     }
