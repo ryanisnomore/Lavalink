@@ -5,15 +5,15 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.jetbrains.dokka") version "1.8.20" apply false
+    id("org.jetbrains.dokka") version "1.9.10" apply false
     id("com.gorylenko.gradle-git-properties") version "2.4.1"
     id("org.ajoberstar.grgit") version "5.2.0"
     id("org.springframework.boot") version "3.1.0" apply false
     id("org.sonarqube") version "4.2.0.3129"
     id("com.adarshr.test-logger") version "3.2.0"
-    id("org.jetbrains.kotlin.jvm") version "2.1.20"
-    id("org.jetbrains.kotlin.plugin.allopen") version "2.1.20"
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.9.20"
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.20"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.20" apply false
     alias(libs.plugins.maven.publish.base) apply false
 }
 
@@ -25,12 +25,12 @@ allprojects {
     version = gitVersion
 
     repositories {
-        mavenCentral() // main maven repo
-        mavenLocal()   // useful for developing
+        mavenCentral()
+        mavenLocal()
         maven("https://m2.dv8tion.net/releases")
         maven("https://maven.lavalink.dev/releases")
         maven("https://maven.lavalink.dev/snapshots")
-        maven("https://jitpack.io") // build projects directly from GitHub
+        maven("https://jitpack.io")
     }
 }
 
@@ -50,11 +50,23 @@ subprojects {
         options.compilerArgs.add("-Xlint:deprecation")
     }
 
+    configurations.all {
+        resolutionStrategy {
+            force("dev.arbjerg:lavaplayer:2.2.4")
+            eachDependency {
+                if (requested.group == "dev.arbjerg" && requested.name == "lavaplayer") {
+                    useVersion("2.2.4")
+                    because("Force lavaplayer to version 2.2.4")
+                }
+            }
+        }
+    }
+
     afterEvaluate {
         plugins.withId(libs.plugins.maven.publish.base.get().pluginId) {
             configure<PublishingExtension> {
-                val mavenUsername = findProperty("MAVEN_USERNAME") as String?
-                val mavenPassword = findProperty("MAVEN_PASSWORD") as String?
+                val mavenUsername = findProperty("MAVEN_USERNAME")?.toString()
+                val mavenPassword = findProperty("MAVEN_PASSWORD")?.toString()
                 if (!mavenUsername.isNullOrEmpty() && !mavenPassword.isNullOrEmpty()) {
                     repositories {
                         val snapshots = "https://maven.lavalink.dev/snapshots"
@@ -71,12 +83,11 @@ subprojects {
                     logger.lifecycle("Not publishing to maven.lavalink.dev because credentials are not set")
                 }
             }
-            // only publish releases to central portal
             if (release) {
                 configure<MavenPublishBaseExtension> {
                     coordinates(group.toString(), project.the<BasePluginExtension>().archivesName.get(), version.toString())
-                    val mavenCentralUsername = findProperty("mavenCentralUsername") as String?
-                    val mavenCentralPassword = findProperty("mavenCentralPassword") as String?
+                    val mavenCentralUsername = findProperty("mavenCentralUsername")?.toString()
+                    val mavenCentralPassword = findProperty("mavenCentralPassword")?.toString()
                     if (!mavenCentralUsername.isNullOrEmpty() && !mavenCentralPassword.isNullOrEmpty()) {
                         publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, false)
                         signAllPublications()
@@ -90,6 +101,44 @@ subprojects {
                         licenses {
                             license {
                                 name = "MIT License"
+                                url = "https://github.com/lavalink-devs/Lavalink/blob/main/LICENSE"
+                            }
+                        }
+
+                        developers {
+                            developer {
+                                id = "freyacodes"
+                                name = "Freya Arbjerg"
+                                url = "https://www.arbjerg.dev"
+                            }
+                        }
+
+                        scm {
+                            url = "https://github.com/lavalink-devs/Lavalink/"
+                            connection = "scm:git:git://github.com/lavalink-devs/Lavalink.git"
+                            developerConnection = "scm:git:ssh://git@github.com/lavalink-devs/Lavalink.git"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun versionFromGit(): Pair<String, Boolean> {
+    Grgit.open(mapOf("currentDir" to project.rootDir)).use { git ->
+        val headTag = git.tag
+            .list()
+            .find { it.commit.id == git.head().id }
+
+        val clean = git.status().isClean || System.getenv("CI") != null
+        if (!clean) {
+            logger.lifecycle("Git state is dirty, version is a snapshot.")
+        }
+
+        return if (headTag != null && clean) headTag.name to true else "${git.head().id}-SNAPSHOT" to false
+    }
+}                                name = "MIT License"
                                 url = "https://github.com/lavalink-devs/Lavalink/blob/main/LICENSE"
                             }
                         }
