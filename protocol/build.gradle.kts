@@ -1,7 +1,6 @@
 import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinMultiplatform
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsPlugin.Companion.kotlinNodeJsEnvSpec
+import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 
 plugins {
@@ -18,8 +17,11 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     jvm {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_17
+        withJava()
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "17"  // Changed from JvmTarget.JVM_17 to string "17"
+            }
         }
     }
 
@@ -28,8 +30,6 @@ kotlin {
         browser()
         compilations.all {
             packageJson {
-                //language=RegExp
-                // npm doesn't support our versioning :(
                 val validVersion = """\d+\.\d+\.\d+""".toRegex()
                 if (!validVersion.matches(project.version.toString())) {
                     version = "4.0.0"
@@ -48,7 +48,7 @@ kotlin {
 
     iosArm64()
     iosSimulatorArm64()
-    iosSimulatorArm64()
+    iosX64()
 
     watchosArm64()
     watchosSimulatorArm64()
@@ -58,13 +58,11 @@ kotlin {
     tvosSimulatorArm64()
     tvosX64()
 
-    compilerOptions {
-        freeCompilerArgs.add("-Xconsistent-data-class-copy-visibility")
-    }
-
     sourceSets {
         all {
-            languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
+            languageSettings {
+                optIn("kotlinx.serialization.ExperimentalSerializationApi")
+            }
         }
 
         commonMain {
@@ -81,13 +79,13 @@ kotlin {
             }
         }
 
-        named("jsTest") {
+        val jsTest by getting {
             dependencies {
                 implementation(kotlin("test-js"))
             }
         }
 
-        named("jvmTest") {
+        val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit5"))
             }
@@ -111,7 +109,7 @@ tasks {
 
 // Use system Node.Js on NixOS
 if (System.getenv("NIX_PROFILES") != null) {
-    kotlinNodeJsEnvSpec.apply {
+    extensions.configure<NodeJsRootExtension> {
         download = false
     }
 }
